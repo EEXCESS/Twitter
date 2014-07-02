@@ -258,3 +258,4 @@ Traceback (most recent call last):
   File "/Library/Frameworks/Python.framework/Versions/3.4/lib/python3.4/site-packages/pymysql/err.py", line 112, in _check_mysql_exception
     raise InternalError(errno, errorvalue)
 peewee.InternalError: (1050, "Table 'user' already exists")
+2014-07-02 16:22:03,393 - INFO - {'friends': []}
