@@ -29,7 +29,7 @@ def extract_keywords():
 
     g = Graph()
     # keyword download: http://zbw.eu/stw/versions/8.12/download/about.de.html
-    g.parse("../stw.nt", format="nt")
+    g.parse("stw.nt", format="nt")
     result = g.query(query_en, initNs={"skos": SKOS, "zbwext": "http://zbw.eu/namespaces/zbw-extensions/"})
 
     keywords = []
@@ -40,7 +40,6 @@ def extract_keywords():
     # keywords_sorted = sorted(keywords, key=str.lower)
     keywords_set = set(keywords)
 
+    print(len(keywords_set))
+
     return keywords_set
-
-
-extract_keywords()

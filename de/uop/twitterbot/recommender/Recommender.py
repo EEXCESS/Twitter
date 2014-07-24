@@ -3,31 +3,69 @@ from persistance import RecommendationDao, UserTweetDao, Enums
 import Config
 
 dev = "http://eexcess-dev.joanneum.at/eexcess-privacy-proxy/api/v1/recommend"
-payload_prefix = '{"eexcess-user-profile": {"interests": {"interest": []},"context-list": {"context": ['
-payload_suffix = ']}}}'
+payload_prefix = '{"partnerList":[{"systemId":"ZBW"}],"contextKeywords":['
+payload_suffix = ']}'
+
+stop_words = [line.strip() for line in open('english')]
+
+"""
+{
+   "partnerList":[
+       {
+          "systemId":"ZBW"
+       }
+   ],
+   "contextKeywords":[
+      {
+         "text":"graz",
+         "weight":0.1,
+         "reason":"manual"
+      },
+      {
+         "text":"vienna",
+         "weight":0.1,
+         "reason":"manual"
+      }
+   ]
+}
+"""
 
 
 def get_recommendation():
+    """ retrieves the tweets from the db, gets recommendation and stores them in the db
+
+    :return: nothing
+    """
     new_tweets = UserTweetDao.get_new_user_tweets()
 
     for tweet in new_tweets:
         UserTweetDao.update_status(tweet, Enums.UserTweetStatus.requested)
         rec_input_list = get_rec_input_from_tweet(tweet)
 
-        rec = None
-
         if len(rec_input_list) > 0:
-            rec = recommend(rec_input_list)
+            recs = recommend(rec_input_list)
 
-        if rec is not None:
-            text = get_rec_text_for_tweet(tweet, rec)
-            RecommendationDao.create_recommendation(tweet.id, rec.fullRec, text)
-            UserTweetDao.update_status(tweet, Enums.UserTweetStatus.done)
+        if len(recs) > 1:
+            max_rec = 2
+        elif len(recs) == 1:
+            max_rec = 1
         else:
+            max_rec = 0
             UserTweetDao.update_status(tweet, Enums.UserTweetStatus.no_recommendation)
+
+        for i in range(max_rec):
+            text = get_rec_text_for_tweet(tweet, recs[i])
+            RecommendationDao.create_recommendation(tweet.id, recs[i].fullRec, text)
+            UserTweetDao.update_status(tweet, Enums.UserTweetStatus.done)
 
 
 def get_rec_text_for_tweet(tweet, rec):
+    """ composes the text for the status update
+
+    :param tweet: the original tweet, used to mention the user
+    :param rec: the recommendation
+    :return: the status update text
+    """
     twitter_max_length = 23  # Twitter.getMaxUrlLength()
     url_length = min(len(rec.uri), twitter_max_length)
     text = "@" + tweet.user.username + " Look: "
@@ -45,18 +83,18 @@ def get_rec_text_for_tweet(tweet, rec):
 
 
 def get_rec_input_from_tweet(tweet):
+    """ extracts the relevant keywords from the tweet
+
+    :param tweet: the tweet containing the tweet text
+    :return: a list of recInput objects
+    """
     # t = ast.literal_eval(tweet.rawInput)
     # print(tweet.rawInput)
     # print(t["entities"]["hashtags"])
     # print(t["entities"]["user_mentions"])
 
     keywords = get_keywords(tweet.tweet)
-    stop_words = [line.strip() for line in open('english')]
-    filtered_keywords = []
-
-    for keyword in keywords:
-        if keyword.lower() not in stop_words:
-            filtered_keywords.append(keyword)
+    filtered_keywords = eliminate_stopwords(keywords)
 
     rec_input_list = []
 
@@ -69,17 +107,44 @@ def get_rec_input_from_tweet(tweet):
     return rec_input_list
 
 
+def eliminate_stopwords(keywords):
+    """ Eliminates english stopwords
+
+    :param keywords: the input keywords possibly containing stopwords
+    :return: stopword free keywords
+    """
+    filtered_keywords = []
+
+    for keyword in keywords:
+        if keyword.lower() not in stop_words:
+            filtered_keywords.append(keyword)
+
+    return filtered_keywords
+
+
 def get_keywords(tweet):
+    """ extracts all words from the tweet removing unwanted chars
+
+    :param tweet: the tweet text
+    :return: a list of words
+    """
     # remove mention of the bot
     tweet = tweet.replace(Config.name, "")
-    # remove # and @
-    tweet = tweet.replace("#", "")
-    tweet = tweet.replace("@", "")
+    # remove #, @, ...
+    remove_list = ["#", "@", ".", "!", "?", "-", "_", "+", "<", ">"]
+
+    for remove_char in remove_list:
+        tweet = tweet.replace(remove_char, "")
 
     return tweet.split()
 
 
 def recommend(list_rec_input):
+    """ Generates the payload and calls the recommender
+
+    :param list_rec_input: list of recInput objects
+    :return: a list of recommendations, maybe empty
+    """
     #generate payload
     payload = generate_payload(list_rec_input)
     # print("payload: " + payload)
@@ -89,13 +154,18 @@ def recommend(list_rec_input):
     # print("response: " + str(r.json()))
 
     # extract recs
-    recommendation = extract_recommendation(r.json())
+    recs = extract_recommendation(r.json())
     # print("recommendation: " + recommendation.getURI() + " - " + recommendation.getTitle())
 
-    return recommendation
+    return recs
 
 
 def generate_payload(list_rec_input):
+    """ Generates the payload for the recommender call
+
+    :param list_rec_input: list of recInput objects
+    :return: the payload string
+    """
     payload = payload_prefix
 
     for rec_input in list_rec_input:
@@ -109,15 +179,24 @@ def generate_payload(list_rec_input):
 
 
 def extract_recommendation(json):
-    recommendation = None
+    """ extracts the recommendation from the recommender response
+
+    :param json: the json response from the recommender service
+    :return: a list of recommendations, maybe empty
+    """
+    recs = []
 
     if int(json["totalResults"]) > 0:
-        recommendation = Recommendation()
-        recommendation.uri = json["results"][0]["uri"]
-        recommendation.title = json["results"][0]["title"]
-        recommendation.fullRec = json
+        results = json["result"]
 
-    return recommendation
+        for result in results:
+            recommendation = Recommendation()
+            recommendation.uri = result["uri"]
+            recommendation.title = result["title"]
+            recommendation.fullRec = json
+            recs.append(recommendation)
+
+    return recs
 
 
 class Recommendation:

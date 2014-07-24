@@ -15,3 +15,5 @@ class UserStatus(Enum):
 class RecommendationStatus(Enum):
     new = "new"
     done = "done"
+    duplicate = "duplicate"
+    unable = "unable"
