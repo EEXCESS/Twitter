@@ -12,18 +12,16 @@ def create_user(username, twitter_id):
     user.userStatus = Enums.UserStatus.normal.value
     user.save()
 
-    return user.id
+    return user
 
 
 def add_user(username, twitter_id):
     user = get_user_by_twitter_id(twitter_id)
 
     if user is None:
-        user_id = create_user(username, twitter_id)
-    else:
-        user_id = user.id
+        user = create_user(username, twitter_id)
 
-    return user_id
+    return user
 
 
 def update(twitter_id):
@@ -39,7 +37,19 @@ def get_user_by_twitter_id(twitter_id):
     try:
         user = MysqlManager.User.get(MysqlManager.User.twitterId == twitter_id)
     except MysqlManager.User.DoesNotExist as e:
-        logging.exception(e)
         user = None
 
     return user
+
+
+def is_new_user(twitter_id):
+
+    try:
+        user = MysqlManager.User.get(MysqlManager.User.twitterId == twitter_id)
+    except MysqlManager.User.DoesNotExist as e:
+        user = None
+
+    if user is None:
+        return True
+    else:
+        return False

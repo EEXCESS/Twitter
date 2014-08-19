@@ -1,6 +1,7 @@
 import requests
 from persistance import RecommendationDao, UserTweetDao, Enums
 import Config
+import logging
 
 dev = "http://eexcess-dev.joanneum.at/eexcess-privacy-proxy/api/v1/recommend"
 payload_prefix = '{"partnerList":[{"systemId":"ZBW"}],"contextKeywords":['
@@ -45,18 +46,12 @@ def get_recommendation():
         if len(rec_input_list) > 0:
             recs = recommend(rec_input_list)
 
-        if len(recs) > 1:
-            max_rec = 2
-        elif len(recs) == 1:
-            max_rec = 1
-        else:
-            max_rec = 0
-            UserTweetDao.update_status(tweet, Enums.UserTweetStatus.no_recommendation)
-
-        for i in range(max_rec):
-            text = get_rec_text_for_tweet(tweet, recs[i])
-            RecommendationDao.create_recommendation(tweet.id, recs[i].fullRec, text)
-            UserTweetDao.update_status(tweet, Enums.UserTweetStatus.done)
+            if len(recs) > 0:
+                text = get_rec_text_for_tweet(tweet, recs[0])
+                RecommendationDao.create_recommendation(tweet.id, recs[0].fullRec, text)
+                UserTweetDao.update_status(tweet, Enums.UserTweetStatus.done)
+            else:
+                UserTweetDao.update_status(tweet, Enums.UserTweetStatus.no_recommendation)
 
 
 def get_rec_text_for_tweet(tweet, rec):
@@ -68,7 +63,7 @@ def get_rec_text_for_tweet(tweet, rec):
     """
     twitter_max_length = 23  # Twitter.getMaxUrlLength()
     url_length = min(len(rec.uri), twitter_max_length)
-    text = "@" + tweet.user.username + " Look: "
+    text = "Hey @" + tweet.user.username + ", I recommend you: "
     prefix_length = len(text) + url_length + 1
     length_left = 140 - prefix_length
 
@@ -149,13 +144,22 @@ def recommend(list_rec_input):
     payload = generate_payload(list_rec_input)
     # print("payload: " + payload)
 
-    # Query backend
-    r = requests.post(dev, data=payload)
-    # print("response: " + str(r.json()))
+    r = None
 
-    # extract recs
-    recs = extract_recommendation(r.json())
-    # print("recommendation: " + recommendation.getURI() + " - " + recommendation.getTitle())
+    try:
+        # Query backend
+        r = requests.post(dev, data=payload)
+        # print("response: " + str(r.json()))
+    except Exception as e:
+        print(e)
+        logging.exception(e)
+
+    recs = []
+
+    if r is not None:
+        # extract recs
+        recs = extract_recommendation(r.json())
+        #print("recommendation: " + recommendation.getURI() + " - " + recommendation.getTitle())
 
     return recs
 

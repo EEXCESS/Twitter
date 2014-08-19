@@ -20,18 +20,17 @@ def create_user_tweet(user_id, twitter_id, tweet_input, raw_input):
 def get_user_tweet_by_twitter_id(twitter_id):
 
     try:
-        user_tweet = MysqlManager.UserTweet.get(MysqlManager.User.twitterId == twitter_id)
-    except MysqlManager.User.DoesNotExist as e:
-        logging.exception(e)
+        user_tweet = MysqlManager.UserTweet.get(MysqlManager.UserTweet.twitterId == twitter_id)
+    except MysqlManager.UserTweet.DoesNotExist as e:
         user_tweet = None
 
     return user_tweet
 
 
-def is_new_user_tweet(twitter_id):
+def is_existing_user_tweet(twitter_id):
     tweet = get_user_tweet_by_twitter_id(twitter_id)
 
-    if tweet is not None:
+    if tweet is None:
         return False
     else:
         return True
