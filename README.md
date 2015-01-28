@@ -3,7 +3,7 @@ twitter-recommender-bot
 
 The TwitterBot is able to recommend resources based on keywords extracted from twitter status updates using the Twitter Stream and REST API. This Twitter application is used as a distribution channel for recommendations provided by the EEXCESS recommender system. Amongst others, the bot is able to follow the current stream of tweets and can reply with a recommendation after identifying a relevant tweet.
 
-Check out this abstract for more information.
+Check out this [abstract] (https://github.com/EEXCESS/Twitter/blob/master/Abstract-TwitterBot.pdf?raw=true) for more information.
 
 
 #### Setup
