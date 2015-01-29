@@ -143,12 +143,13 @@ def recommend(list_rec_input):
     #generate payload
     payload = generate_payload(list_rec_input)
     # print("payload: " + payload)
+    headers = {'content-type': 'application/json', 'origin': 'twitterBot'}
 
     r = None
 
     try:
         # Query backend
-        r = requests.post(dev, data=payload)
+        r = requests.post(dev, data=payload, headers=headers)
         # print("response: " + str(r.json()))
     except Exception as e:
         print(e)
