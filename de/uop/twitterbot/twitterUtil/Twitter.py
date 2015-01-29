@@ -7,8 +7,25 @@ from keywords import KeywordsUtil
 import random
 import time
 
+threshold_domain_expert = 30
 number_query_items = 50
 rotate_after_hits = 1
+
+
+def get_timeline_by_id(twitterId, bwl_list):
+    t = Twitter(auth=OAuth(Config.access_token, Config.access_token_secret, Config.api_key, Config.api_secret))
+    iterator = t.statuses.user_timeline(id=twitterId, count=200)
+
+    i = 0
+    for tweet in iterator:
+        for key in bwl_list:
+            key = key.lower()
+            if key in tweet["text"].lower():
+                i += 1
+                # print(key)
+
+    # print("count: " + str(i))
+    return i
 
 
 def read_twitter():
@@ -21,36 +38,49 @@ def read_twitter():
         print("- read stream")
         read_filtered_stream(bwl_list)
         print("- sleep")
-        time.sleep(120)  # wait 2 minutes
+        time.sleep(300)  # wait 5 minutes
 
 
 def read_filtered_stream(bwl_list):
     query = ""
 
     for i in range(number_query_items):
-        query += random.choice(bwl_list) + ", "
+        query += random.choice(bwl_list) + ","
 
-    query = query[:-2]
+    query = query[:-1]
     twitter_stream = TwitterStream(auth=OAuth(Config.access_token, Config.access_token_secret, Config.api_key, Config.api_secret), domain='userstream.twitter.com')
     iterator = twitter_stream.statuses.filter(track=query)
 
     i = 0
+    rest_calls = 0
     for tweet in iterator:
         if "lang" in tweet and "retweeted_status" not in tweet:
             if "en" == tweet["lang"]:
                 if UserDao.is_new_user(tweet["user"]["id"]):
 
-                    key_list = []
+                    if rest_calls < 5:
 
-                    for key in bwl_list:
-                        key = key.lower()
-                        if key in tweet["text"].lower():
-                            key_list.append(key)
+                        rest_calls += 1
 
-                    recs = do_recommendation(tweet, " ".join(key_list), True)
+                        # check if user has multiple tweets with keywords
+                        count = get_timeline_by_id(tweet["user"]["id"], bwl_list)
 
-                    if recs > 0:
-                        i += 1
+                        if count > threshold_domain_expert:
+                            key_list = []
+
+                            for key in bwl_list:
+                                key = key.lower()
+                                if key in tweet["text"].lower():
+                                    key_list.append(key)
+
+                            recs = do_recommendation(tweet, " ".join(key_list), True)
+
+                            if recs > 0:
+                                i += 1
+                                print("rec found")
+                    else:
+                        print("rest calls exhausted")
+                        break
 
         if i == rotate_after_hits:
             break
@@ -156,6 +186,8 @@ def distribute_recommendations():
             t.statuses.update(status=rec.text, in_reply_to_status_id=rec.userTweet.twitterId)
             RecommendationDao.update_status(rec, Enums.RecommendationStatus.done)
         except Exception as e:
+
+            print(e)
             if "duplicate" in str(e):
                 RecommendationDao.update_status(rec, Enums.RecommendationStatus.duplicate)
             else:
