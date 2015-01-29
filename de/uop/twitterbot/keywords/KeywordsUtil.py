@@ -66,15 +66,39 @@ def extract_keywords():
     keywords = []
 
     for row in result_b:
-        keywords.append(row.label)
+        keywords.append(row.label.lower())
 
     for row in result_v:
-        keywords.append(row.label)
+        keywords.append(row.label.lower())
 
     # keywords_sorted = sorted(keywords, key=str.lower)
     keywords_set = set(keywords)
+    blacklist = get_blacklist()
+
+    print("keywords: " + str(len(keywords_set)))
+
+    print("blacklist " + str(len(blacklist)))
+
+    for word in blacklist:
+        if word in keywords_set:
+            keywords_set.remove(word)
+
+    print("final " + str(len(keywords_set)))
 
     return keywords_set
+
+
+
+
+def get_blacklist():
+    blacklist_raw = [line.strip() for line in open('keywords_blacklist')]
+    blacklist = []
+
+    for word in blacklist_raw:
+        if word.startswith("-"):
+            blacklist.append(word[1:])
+
+    return blacklist
 
 
 extract_keywords()
